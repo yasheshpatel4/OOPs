@@ -2,13 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-// -------- Custom Exception --------
 class VehicleUnavailableException : Exception
 {
     public VehicleUnavailableException(string msg) : base(msg) { }
 }
 
-// -------- Vehicle Base --------
 class Vehicle
 {
     public int id;
@@ -19,25 +17,21 @@ class Vehicle
     public bool available = true;
 }
 
-// -------- Car --------
 class Car : Vehicle
 {
     public string fuelType;
 }
 
-// -------- Bike --------
 class Bike : Vehicle
 {
     public int engineCapacity;
 }
 
-// -------- Truck --------
 class Truck : Vehicle
 {
     public int loadingCapacity;
 }
 
-// -------- Customer --------
 class Customer
 {
     public int id;
@@ -45,7 +39,6 @@ class Customer
     public string contact;
 }
 
-// -------- Rental --------
 class Rental
 {
     public int rentalId;
@@ -58,7 +51,6 @@ class Rental
     public int finalCost;
 }
 
-// -------- Rental System --------
 class RentalSystem
 {
     public List<Vehicle> vehicles = new List<Vehicle>();
@@ -66,8 +58,7 @@ class RentalSystem
     public List<Rental> rentals = new List<Rental>();
     int rid = 1;
 
-    // Static festive discount
-    public static int festiveDiscount = 10; // percent
+    public static int festiveDiscount = 10; 
 
     public void Book(string key, Customer c, int hours, bool festive)
     {
@@ -143,14 +134,11 @@ class RentalSystem
     }
 }
 
-// -------- Main --------
 class Program
 {
     static void Main()
     {
         RentalSystem rs = new RentalSystem();
-
-        // Vehicles
         rs.vehicles.Add(new Car { id = 1, regNo = "C1", brand = "Honda", model = "City", costPerHour = 100, fuelType = "Petrol" });
         rs.vehicles.Add(new Car { id = 2, regNo = "C2", brand = "Tesla", model = "Model3", costPerHour = 150, fuelType = "Electric" });
         rs.vehicles.Add(new Bike { id = 3, regNo = "B1", brand = "Yamaha", model = "R15", costPerHour = 50, engineCapacity = 155 });
@@ -158,7 +146,7 @@ class Program
         rs.vehicles.Add(new Truck { id = 5, regNo = "T1", brand = "Tata", model = "Ace", costPerHour = 200, loadingCapacity = 1000 });
         rs.vehicles.Add(new Truck { id = 6, regNo = "T2", brand = "Ashok", model = "Ecomet", costPerHour = 300, loadingCapacity = 3000 });
 
-        // Customers
+
         Customer c1 = new Customer { id = 1, name = "Amit", contact = "9999999999" };
         Customer c2 = new Customer { id = 2, name = "Ravi", contact = "8888888888" };
 

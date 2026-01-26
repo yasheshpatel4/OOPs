@@ -55,7 +55,7 @@ class Tran
     public Member member;
     public int borrowDay;
     public int dueDay;
-    public int returnDay;   // -1 means not returned
+    public int returnDay;  
 }
 
 class Library
@@ -153,14 +153,12 @@ class Program
     {
         Library lb = new Library();
 
-        // Books
         lb.bks.Add(new EBook { id = 1, ttl = "AI", cat = "Sci", sz = 5 });
         lb.bks.Add(new EBook { id = 2, ttl = "Cloud", cat = "Tech", sz = 8 });
         lb.bks.Add(new PBook { id = 3, ttl = "Java", cat = "Tech", loc = "A1" });
         lb.bks.Add(new PBook { id = 4, ttl = "DBMS", cat = "Edu", loc = "B2" });
         lb.bks.Add(new PBook { id = 5, ttl = "Story", cat = "Fic", loc = "C3" });
 
-        // Members
         Student s = new Student { id = 1, nm = "Amit" };
         Regular r = new Regular { id = 2, nm = "Ravi" };
         Premium p = new Premium { id = 3, nm = "Neha" };
@@ -169,9 +167,9 @@ class Program
         lb.Borrow("Tech", r);
         lb.Borrow("Story", p);
 
-        lb.Return(1, 20);   // returned late
+        lb.Return(1, 20);
 
         lb.ShowBorrowed();
-        lb.ShowOverdue(40);
+        lb.ShowOverdue(30);
     }
 }
