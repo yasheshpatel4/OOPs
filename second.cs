@@ -1,170 +1,224 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
-class VehicleUnavailableException : Exception
+interface IRentable
 {
-    public VehicleUnavailableException(string msg) : base(msg) { }
+    bool IsAvailable { get; }
+    void Rent();
+    void Return();
 }
 
-class Vehicle
+interface IDiscountPolicy
 {
-    public int id;
-    public string regNo;
-    public string brand;
-    public string model;
-    public int costPerHour;
-    public bool available = true;
+    double CalculateDiscount(double baseCost, int rentalHours);
+}
+
+abstract class Vehicle : IRentable
+{
+    public string RegistrationNumber { get; }
+    public string Brand { get; }
+    public string Model { get; }
+    public double CostPerHour { get; }
+    public bool IsAvailable { get; private set; } = true;
+
+    protected Vehicle(string regNo, string brand, string model, double costPerHour)
+    {
+        RegistrationNumber = regNo;
+        Brand = brand;
+        Model = model;
+        CostPerHour = costPerHour;
+    }
+
+    public void Rent()
+    {
+        if (!IsAvailable)
+            throw new VehicleUnavailableException("Vehicle not available");
+        IsAvailable = false;
+    }
+
+    public void Return()
+    {
+        IsAvailable = true;
+    }
 }
 
 class Car : Vehicle
 {
-    public string fuelType;
+    public string FuelType { get; }
+
+    public Car(string regNo, string brand, string model, double costPerHour, string fuelType)
+        : base(regNo, brand, model, costPerHour)
+    {
+        FuelType = fuelType;
+    }
 }
 
 class Bike : Vehicle
 {
-    public int engineCapacity;
+    public int EngineCC { get; }
+
+    public Bike(string regNo, string brand, string model, double costPerHour, int engineCC)
+        : base(regNo, brand, model, costPerHour)
+    {
+        EngineCC = engineCC;
+    }
 }
 
 class Truck : Vehicle
 {
-    public int loadingCapacity;
+    public int LoadCapacity { get; }
+
+    public Truck(string regNo, string brand, string model, double costPerHour, int loadCapacity)
+        : base(regNo, brand, model, costPerHour)
+    {
+        LoadCapacity = loadCapacity;
+    }
 }
 
 class Customer
 {
-    public int id;
-    public string name;
-    public string contact;
-}
+    public string Name { get; }
+    public string Contact { get; }
 
-class Rental
-{
-    public int rentalId;
-    public Vehicle vehicle;
-    public Customer customer;
-    public int rentalStartHour;
-    public int rentalDurationHours;
-    public int baseCost;
-    public int discount;
-    public int finalCost;
-}
-
-class RentalSystem
-{
-    public List<Vehicle> vehicles = new List<Vehicle>();
-    public List<Customer> customers = new List<Customer>();
-    public List<Rental> rentals = new List<Rental>();
-    int rid = 1;
-
-    public static int festiveDiscount = 10; 
-
-    public void Book(string key, Customer c, int hours, bool festive)
+    public Customer(string name, string contact)
     {
-        Vehicle v = vehicles.FirstOrDefault(x =>
-            (x.brand == key || x.model == key || x.GetType().Name == key)
-            && x.available);
+        Name = name;
+        Contact = contact;
+    }
+}
 
-        if (v == null)
-            throw new VehicleUnavailableException("Vehicle Not Available");
+class LongDurationDiscount : IDiscountPolicy
+{
+    public double CalculateDiscount(double baseCost, int rentalHours)
+    {
+        return rentalHours > 24 ? baseCost * 0.10 : 0;
+    }
+}
 
-        v.available = false;
+class FestiveSeasonDiscount : IDiscountPolicy
+{
+    public double CalculateDiscount(double baseCost, int rentalHours)
+    {
+        return baseCost * 0.05;
+    }
+}
 
-        int baseCost = v.costPerHour * hours;
-        int disc = 0;
+class RentalTransaction
+{
+    private static int counter = 1;
 
-        if (hours > 24)
-            disc += baseCost * 20 / 100;
+    public int RentalId { get; }
+    public Vehicle Vehicle { get; }
+    public Customer Customer { get; }
+    public int RentalHours { get; }
+    public double BaseCost { get; }
+    public double FinalCost { get; private set; }
 
-        if (festive)
-            disc += baseCost * festiveDiscount / 100;
+    public RentalTransaction(Vehicle vehicle, Customer customer, int hours)
+    {
+        RentalId = counter++;
+        Vehicle = vehicle;
+        Customer = customer;
+        RentalHours = hours;
+        BaseCost = vehicle.CostPerHour * hours;
+    }
 
-        int finalCost = baseCost - disc;
+    public void ApplyDiscounts(List<IDiscountPolicy> discountPolicies)
+    {
+        double totalDiscount = 0;
 
-        Rental r = new Rental
+        for (int i = 0; i < discountPolicies.Count; i++)
+            totalDiscount += discountPolicies[i].CalculateDiscount(BaseCost, RentalHours);
+
+        FinalCost = BaseCost - totalDiscount;
+    }
+}
+
+class RentalService
+{
+    private readonly List<RentalTransaction> rentals = new();
+
+    public RentalTransaction BookVehicle(
+        Vehicle vehicle,
+        Customer customer,
+        int rentalHours,
+        List<IDiscountPolicy> discounts)
+    {
+        vehicle.Rent();
+
+        var rental = new RentalTransaction(vehicle, customer, rentalHours);
+        rental.ApplyDiscounts(discounts);
+        rentals.Add(rental);
+
+        Console.WriteLine($"Rental ID: {rental.RentalId}");
+        Console.WriteLine($"Vehicle: {vehicle.Brand} {vehicle.Model}");
+        Console.WriteLine($"Customer: {customer.Name}");
+        Console.WriteLine($"Duration: {rentalHours} hours");
+        Console.WriteLine($"Base Cost: ₹{rental.BaseCost}");
+        Console.WriteLine($"Final Cost: ₹{rental.FinalCost}");
+        Console.WriteLine("--------------------------------");
+
+        return rental;
+    }
+
+    public void ReturnVehicle(RentalTransaction rental)
+    {
+        rental.Vehicle.Return();
+    }
+
+    public void PrintRentalReport()
+    {
+        Console.WriteLine("Rental Report:");
+        for (int i = 0; i < rentals.Count; i++)
         {
-            rentalId = rid++,
-            vehicle = v,
-            customer = c,
-            rentalStartHour = 0,
-            rentalDurationHours = hours,
-            baseCost = baseCost,
-            discount = disc,
-            finalCost = finalCost
-        };
-
-        rentals.Add(r);
-
-        Console.WriteLine("\nBooking Successful:");
-        Console.WriteLine($"Rental ID: {r.rentalId}");
-        Console.WriteLine($"Vehicle: {v.GetType().Name} {v.model}");
-        Console.WriteLine($"Customer: {c.name}");
-        Console.WriteLine($"Duration (hrs): {hours}");
-        Console.WriteLine($"Estimated Cost: {finalCost}");
+            Console.WriteLine($"{rentals[i].Vehicle.Model} | {rentals[i].Customer.Name} | ₹{rentals[i].FinalCost}");
+        }
     }
+}
 
-    public void ShowInvoice(int id)
-    {
-        Rental r = rentals.First(x => x.rentalId == id);
-
-        Console.WriteLine("\nFinal Invoice:");
-        Console.WriteLine($"Base Cost: {r.baseCost}");
-        Console.WriteLine($"Discount: {r.discount}");
-        Console.WriteLine($"Grand Total: {r.finalCost}");
-    }
-
-    public void ShowAvailable()
-    {
-        Console.WriteLine("\nAvailable Vehicles:");
-        foreach (var v in vehicles.Where(x => x.available))
-            Console.WriteLine($"{v.GetType().Name} - {v.brand} {v.model}");
-    }
-
-    public void RemoveVehicle(int id)
-    {
-        vehicles.RemoveAll(x => x.id == id);
-    }
-
-    public void Report()
-    {
-        Console.WriteLine("\nRental Report:");
-        foreach (var r in rentals)
-            Console.WriteLine($"{r.vehicle.model} rented by {r.customer.name}");
-    }
+class VehicleUnavailableException : Exception
+{
+    public VehicleUnavailableException(string message) : base(message) { }
 }
 
 class Program
 {
     static void Main()
     {
-        RentalSystem rs = new RentalSystem();
-        rs.vehicles.Add(new Car { id = 1, regNo = "C1", brand = "Honda", model = "City", costPerHour = 100, fuelType = "Petrol" });
-        rs.vehicles.Add(new Car { id = 2, regNo = "C2", brand = "Tesla", model = "Model3", costPerHour = 150, fuelType = "Electric" });
-        rs.vehicles.Add(new Bike { id = 3, regNo = "B1", brand = "Yamaha", model = "R15", costPerHour = 50, engineCapacity = 155 });
-        rs.vehicles.Add(new Bike { id = 4, regNo = "B2", brand = "Royal", model = "Classic", costPerHour = 60, engineCapacity = 350 });
-        rs.vehicles.Add(new Truck { id = 5, regNo = "T1", brand = "Tata", model = "Ace", costPerHour = 200, loadingCapacity = 1000 });
-        rs.vehicles.Add(new Truck { id = 6, regNo = "T2", brand = "Ashok", model = "Ecomet", costPerHour = 300, loadingCapacity = 3000 });
+        var vehicles = new List<Vehicle>
+        {
+            new Car("C1", "Tata", "Nexon", 200, "Petrol"),
+            new Car("C2", "Tesla", "Model3", 300, "Electric"),
+            new Bike("B1", "Yamaha", "R15", 100, 155),
+            new Bike("B2", "Honda", "Shine", 80, 125),
+            new Truck("T1", "Tata", "LoadPro", 400, 1000),
+            new Truck("T2", "Ashok", "HeavyX", 450, 1200)
+        };
 
+        var customer1 = new Customer("Rahul", "9999999999");
 
-        Customer c1 = new Customer { id = 1, name = "Amit", contact = "9999999999" };
-        Customer c2 = new Customer { id = 2, name = "Ravi", contact = "8888888888" };
+        var discountPolicies = new List<IDiscountPolicy>
+        {
+            new LongDurationDiscount(),
+            new FestiveSeasonDiscount()
+        };
 
-        rs.customers.Add(c1);
-        rs.customers.Add(c2);
+        var rentalService = new RentalService();
 
         try
         {
-            rs.Book("Car", c1, 30, true);
-            rs.Book("R15", c2, 10, false);
-        }
-        catch (VehicleUnavailableException e)
-        {
-            Console.WriteLine(e.Message);
-        }
+            var rental = rentalService.BookVehicle(
+                vehicles[0],
+                customer1,
+                30,
+                discountPolicies);
 
-        rs.ShowInvoice(1);
-        rs.ShowAvailable();
-        rs.Report();
+            rentalService.ReturnVehicle(rental);
+            rentalService.PrintRentalReport();
+        }
+        catch (VehicleUnavailableException ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
 }

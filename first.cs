@@ -1,175 +1,201 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
-class Book
+abstract class Book 
 {
-    public int id;
-    public string ttl;
-    public string cat;
-    public bool avl = true;
+    public string Title { get; }    
+    public string Category { get; }
+    public bool IsAvailable { get; private set; } = true;
+
+    protected Book(string title, string category)
+    {
+        Title = title;
+        Category = category;
+    }
+
+    public void Borrow()
+    {
+        if (!IsAvailable)
+            throw new BookUnavailableException("Book not available...");
+        IsAvailable = false;
+    }
+
+    public void Return()
+    {
+        IsAvailable = true;
+    }
 }
 
 class EBook : Book
 {
-    public int sz;
+    public double FileSizeMB { get; }
+
+    public EBook(string title, string category, double size)
+        : base(title, category)
+    {
+        FileSizeMB = size;
+    }
 }
 
-class PBook : Book
+class PhysicalBook : Book
 {
-    public string loc;
+    public string Shelf { get; }
+
+    public PhysicalBook(string title, string category, string shelf)
+        : base(title, category)
+    {
+        Shelf = shelf;
+    }
+}
+abstract class Membership 
+{
+    public int MaxBooks { get; }
+    public int BorrowDays { get; }
+
+    protected Membership(int maxBooks, int days)
+    {
+        MaxBooks = maxBooks;
+        BorrowDays = days;
+    }
+
+    public abstract double CalculateLateFee(int lateDays);
 }
 
+class StudentMembership : Membership
+{
+    public StudentMembership() : base(3, 15) { }
+
+    public override double CalculateLateFee(int lateDays)
+        => lateDays * 5;
+}
+
+class RegularMembership : Membership
+{
+    public RegularMembership() : base(5, 30) { }
+
+    public override double CalculateLateFee(int lateDays)
+        => lateDays * 10;
+}
+
+class PremiumMembership : Membership
+{
+    public PremiumMembership() : base(int.MaxValue, 45) { }
+
+    public override double CalculateLateFee(int lateDays)
+        => 0; // No late fee
+}
 class Member
 {
-    public int id;
-    public string nm;
-    public int cnt = 0;
-}
+    public string Name { get; }
+    public Membership Membership { get; }
+    private readonly List<Book> borrowedBooks = new();
 
-class Student : Member
-{
-    public int lim = 3;
-    public int days = 15;
-    public int fee = 2;
-}
-
-class Regular : Member
-{
-    public int lim = 5;
-    public int days = 30;
-    public int fee = 3;
-}
-
-class Premium : Member
-{
-    public int lim = 99;
-    public int days = 45;
-    public int fee = 1;
-}
-
-class Tran
-{
-    public int transactionId;
-    public Book book;
-    public Member member;
-    public int borrowDay;
-    public int dueDay;
-    public int returnDay;  
-}
-
-class Library
-{
-    public List<Book> bks = new List<Book>();
-    public List<Tran> trs = new List<Tran>();
-    int tid = 1;
-
-    public void Borrow(string key, Member m)
+    public Member(string name, Membership membership)
     {
-        int lim = 0, days = 0;
-
-        if (m is Student s) { lim = s.lim; days = s.days; }
-        else if (m is Regular r) { lim = r.lim; days = r.days; }
-        else if (m is Premium p) { lim = p.lim; days = p.days; }
-
-        if (m.cnt >= lim)
-        {
-            Console.WriteLine("Limit Reached");
-            return;
-        }
-
-        Book b = bks.FirstOrDefault(x =>
-            (x.ttl == key || x.cat == key) && x.avl);
-
-        if (b == null)
-        {
-            Console.WriteLine("Book Not Available");
-            return;
-        }
-
-        b.avl = false;
-        m.cnt++;
-
-        Tran t = new Tran
-        {
-            transactionId = tid++,
-            book = b,
-            member = m,
-            borrowDay = 0,
-            dueDay = days,
-            returnDay = -1
-        };
-
-        trs.Add(t);
-
-        Console.WriteLine("\nBorrowed:");
-        Console.WriteLine($"Transaction ID: {t.transactionId}");
-        Console.WriteLine($"Book: {b.ttl}");
-        Console.WriteLine($"Member: {m.nm}");
-        Console.WriteLine($"Borrow Day: {t.borrowDay}");
-        Console.WriteLine($"Due Day: {t.dueDay}");
+        Name = name;
+        Membership = membership;
     }
 
-    public void Return(int id, int retDay)
+    public void BorrowBook(Book book)
     {
-        Tran t = trs.First(x => x.transactionId == id);
-        t.returnDay = retDay;
-        t.book.avl = true;
-        t.member.cnt--;
+        if (borrowedBooks.Count >= Membership.MaxBooks)
+            throw new Exception("Borrow limit exceeded");
 
-        int rate = 0;
-        if (t.member is Student s) rate = s.fee;
-        else if (t.member is Regular r) rate = r.fee;
-        else if (t.member is Premium p) rate = p.fee;
-
-        int lateFee = 0;
-        if (t.returnDay > t.dueDay)
-            lateFee = (t.returnDay - t.dueDay) * rate;
-
-        Console.WriteLine("\nReturned:");
-        Console.WriteLine($"Transaction ID: {t.transactionId}");
-        Console.WriteLine($"Return Day: {t.returnDay}");
-        Console.WriteLine($"Late Fee: {lateFee}");
+        book.Borrow();
+        borrowedBooks.Add(book);
     }
 
-    public void ShowBorrowed()
+    public void ReturnBook(Book book)
     {
-        Console.WriteLine("\nAll Borrowed Books:");
-        foreach (var t in trs.Where(x => x.returnDay == -1))
-            Console.WriteLine($"{t.book.ttl} borrowed by {t.member.nm}");
+        book.Return();
+        borrowedBooks.Remove(book);
     }
 
-    public void ShowOverdue(int currentDay)
+    public int BorrowedCount => borrowedBooks.Count;
+}
+class Transaction
+{
+    private static int counter = 1;
+
+    public int TransactionId { get; }
+    public Book Book { get; }
+    public Member Member { get; }
+    public int BorrowDay { get; }
+    public int DueDay { get; }
+    public int? ReturnDay { get; private set; }
+
+    public Transaction(Book book, Member member, int currentDay)
     {
-        Console.WriteLine("\nOverdue Books:");
-        foreach (var t in trs.Where(x => x.returnDay == -1 && currentDay > x.dueDay))
-            Console.WriteLine($"{t.book.ttl} borrowed by {t.member.nm}");
+        TransactionId = counter++;
+        Book = book;
+        Member = member;
+        BorrowDay = currentDay;
+        DueDay = BorrowDay + member.Membership.BorrowDays;
+    }
+
+    public double CloseTransaction(int returnDay)
+    {
+        ReturnDay = returnDay;
+        int lateDays = Math.Max(0, returnDay - DueDay);
+        return Member.Membership.CalculateLateFee(lateDays);
+    }
+}
+class BorrowService
+{
+    private readonly List<Transaction> transactions = new();
+
+    public Transaction Borrow(Member member, Book book, int currentDay)
+    {
+        member.BorrowBook(book);
+        var tx = new Transaction(book, member, currentDay);
+        transactions.Add(tx);
+
+        Console.WriteLine($"TX:{tx.TransactionId} | {book.Title} | {member.Name} | Due Day:{tx.DueDay}");
+        return tx;
+    }
+
+    public void Return(Transaction tx, int currentDay)
+    {
+        double fee = tx.CloseTransaction(currentDay);
+        tx.Member.ReturnBook(tx.Book);
+
+        Console.WriteLine($"TX:{tx.TransactionId} | Returned Day:{currentDay} | Fee:₹{fee}");
+    }
+
+    public void PrintOverdue(int currentDay)
+    {
+        foreach (var tx in transactions)
+            if (tx.ReturnDay == null && currentDay > tx.DueDay)
+                Console.WriteLine("Overdue: " + tx.Book.Title);
     }
 }
 
+class BookUnavailableException : Exception
+{
+    public BookUnavailableException(string msg) : base(msg) { }
+}
 class Program
 {
     static void Main()
     {
-        Library lb = new Library();
+        var books = new List<Book>
+        {
+            new EBook("C# Pro", "Programming", 5.4),
+            new EBook("Java Master", "Programming", 6.1),
+            new PhysicalBook("Physics", "Science", "A1"),
+            new PhysicalBook("Chemistry", "Science", "B2"),
+            new PhysicalBook("Maths", "Education", "C3")
+        };
+        var student = new Member("Amit", new StudentMembership());
 
-        lb.bks.Add(new EBook { id = 1, ttl = "AI", cat = "Sci", sz = 5 });
-        lb.bks.Add(new EBook { id = 2, ttl = "Cloud", cat = "Tech", sz = 8 });
-        lb.bks.Add(new PBook { id = 3, ttl = "Java", cat = "Tech", loc = "A1" });
-        lb.bks.Add(new PBook { id = 4, ttl = "DBMS", cat = "Edu", loc = "B2" });
-        lb.bks.Add(new PBook { id = 5, ttl = "Story", cat = "Fic", loc = "C3" });
+        var borrowService = new BorrowService();
+        int currentDay = 1;
 
-        Student s = new Student { id = 1, nm = "Amit" };
-        Regular r = new Regular { id = 2, nm = "Ravi" };
-        Premium p = new Premium { id = 3, nm = "Neha" };
+        var tx1 = borrowService.Borrow(student, books[0], currentDay);
 
-        lb.Borrow("AI", s);
-        lb.Borrow("Tech", r);
-        lb.Borrow("Story", p);
+        currentDay = 20;
 
-        lb.Return(1, 20);
-
-        lb.ShowBorrowed();
-        lb.ShowOverdue(30);
+        borrowService.Return(tx1, currentDay);
+        borrowService.PrintOverdue(currentDay);
     }
 }
